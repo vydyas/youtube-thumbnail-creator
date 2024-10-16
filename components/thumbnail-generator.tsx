@@ -539,7 +539,7 @@ export default function ImageEditor() {
       {/* Left Sidebar */}
       <div className="w-64 bg-white shadow-md flex flex-col">
         <div className="p-4">
-          <h2 className="text-lg font-semibold mb-4">Custom Design Editor</h2>
+          <h2 className="text-lg font-semibold mb-4">YT Thumbnail Editor</h2>
           {sidebarItems.map((item, index) => (
             <Button
               key={index}
