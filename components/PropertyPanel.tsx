@@ -14,15 +14,10 @@ interface PropertyPanelProps {
 }
 
 const PropertyPanel: React.FC<PropertyPanelProps> = ({
-  selectedElement,
   imageWidth,
   setImageWidth,
   imageHeight,
   setImageHeight,
-  textPositionX,
-  setTextPositionX,
-  textPositionY,
-  setTextPositionY,
 }) => {
   return (
     <div className="property-panel">

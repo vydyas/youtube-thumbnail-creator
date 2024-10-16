@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import {
   Stage,
   Layer,
@@ -22,7 +22,6 @@ import {
   Image,
   Type,
   Layers,
-  Maximize2,
   Grid,
   Bold,
   Italic,
@@ -412,8 +411,8 @@ export default function ImageEditor() {
   const [backgroundImage, setBackgroundImage] =
     useState<HTMLImageElement | null>(null);
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
-  const [borderWidth, setBorderWidth] = useState(0);
-  const [borderColor, setBorderColor] = useState("#000000");
+  const borderWidth = 0;
+  const borderColor = "#000000";
   const [texts, setTexts] = useState<
     Array<{
       id: string;
@@ -427,8 +426,6 @@ export default function ImageEditor() {
       fontFamily: string;
     }>
   >([]);
-  const [textColor, setTextColor] = useState("#000000");
-  const [fontSize, setFontSize] = useState(24);
   const [selectedId, selectShape] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [showPanel, setShowPanel] = useState(false);
@@ -474,7 +471,7 @@ export default function ImageEditor() {
     setTexts([...texts, newText]);
   };
 
-  const handleTextChange = (id: string, key: string, value: any) => {
+  const handleTextChange = (id: string, key: string, value: string | number) => {
     setTexts(texts.map((t) => (t.id === id ? { ...t, [key]: value } : t)));
   };
 
