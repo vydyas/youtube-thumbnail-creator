@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Stage,
   Layer,
@@ -18,16 +18,20 @@ import {
 } from "@/components/ui/popover";
 import { HexColorPicker } from "react-colorful";
 import {
-  Upload,
-  Image,
   Type,
+  Image,
   Layers,
   Grid,
+  Download,
   Bold,
   Italic,
   Underline,
+  Upload,
+  Trash2,
+  RotateCw,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const STAGE_WIDTH = 800;
 const STAGE_HEIGHT = 500;
@@ -407,6 +411,24 @@ const templates: Template[] = [
   },
 ];
 
+
+const textTemplates = [
+  { name: "Title", text: "Your Title Here", fontSize: 48, color: "#000000" },
+  { name: "Subtitle", text: "Your Subtitle", fontSize: 24, color: "#666666" },
+  {
+    name: "Call to Action",
+    text: "Click Now!",
+    fontSize: 36,
+    color: "#ff0000",
+  },
+  {
+    name: "Description",
+    text: "Brief description text",
+    fontSize: 18,
+    color: "#333333",
+  },
+];
+
 export default function ImageEditor() {
   const [backgroundImage, setBackgroundImage] =
     useState<HTMLImageElement | null>(null);
@@ -424,29 +446,39 @@ export default function ImageEditor() {
       fontStyle: string;
       textDecoration: string;
       fontFamily: string;
+      rotation: number;
     }>
   >([]);
   const [selectedId, selectShape] = useState<string | null>(null);
-  const [scale, setScale] = useState(1);
+  const [containerScale, setContainerScale] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [showPanel, setShowPanel] = useState(false);
-  const [activeTab, setActiveTab] = useState("Templates");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const img = new window.Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        setBackgroundImage(img);
-      };
+  useEffect(() => {
+    // Apply Minimalist template by default
+    const minimalistTemplate = templates.find(
+      (template) => template.name === "Minimalist"
+    );
+    if (minimalistTemplate) {
+      applyTemplate(minimalistTemplate);
     }
-  };
+  }, []);
 
-  const handleAddText = () => {
+  useEffect(() => {
+    if (selectedId) {
+      const selectedNode = stageRef.current?.findOne(`#${selectedId}`);
+      if (selectedNode && trRef.current) {
+        trRef.current.nodes([selectedNode]);
+        trRef.current.getLayer()?.batchDraw();
+      }
+    }
+  }, [selectedId]);
+
+  const handleAddText = (template: typeof textTemplates[0] | null = null) => {
     const getRandomPosition = (maxWidth: number, maxHeight: number) => {
       return {
         x: Math.floor(Math.random() * (maxWidth - 100)), // Ensuring some margin
@@ -456,22 +488,37 @@ export default function ImageEditor() {
 
     const { x, y } = getRandomPosition(STAGE_WIDTH, STAGE_HEIGHT);
 
-    const newText = {
-      id: `text-${texts.length + 1}`,
-      text: "New Text",
-      fontSize: 24,
-      color: "#000000",
-      x: x,
-      y: y,
-      fontStyle: "normal",
-      textDecoration: "",
-      fontFamily: "Arial",
-    };
-
+    const newText = template
+      ? {
+          id: `text-${texts.length + 1}`,
+          ...(template as { fontSize: number; color: string; text: string }),
+          x,
+          y,
+          fontStyle: "normal",
+          textDecoration: "",
+          fontFamily: "Arial",
+          rotation: 0,
+        }
+      : {
+          id: `text-${texts.length + 1}`,
+          text: "New Text",
+          fontSize: 24,
+          color: "#000000",
+          x: 50,
+          y: 50,
+          fontStyle: "normal",
+          textDecoration: "",
+          fontFamily: "Arial",
+          rotation: 0,
+        };
     setTexts([...texts, newText]);
   };
 
-  const handleTextChange = (id: string, key: string, value: string | number) => {
+  const handleTextChange = (
+    id: string,
+    key: string,
+    value: string | number
+  ) => {
     setTexts(texts.map((t) => (t.id === id ? { ...t, [key]: value } : t)));
   };
 
@@ -487,6 +534,9 @@ export default function ImageEditor() {
         "fontSize",
         Math.round(node.fontSize() * scaleX)
       );
+      handleTextChange(node.id(), "x", node.x());
+      handleTextChange(node.id(), "y", node.y());
+      handleTextChange(node.id(), "rotation", node.rotation());
     } else if (node instanceof Konva.Image) {
       node.width(node.width() * scaleX);
       node.height(node.height() * scaleY);
@@ -517,108 +567,167 @@ export default function ImageEditor() {
     }
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const img = new window.Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        setBackgroundImage(img);
+      };
+    }
+  };
+
   const applyTemplate = (template: Template) => {
     setBackgroundColor(template.backgroundColor);
     setTexts(
       template.texts.map((text, index) => ({
         id: `text-${index + 1}`,
         ...text,
+        rotation: 0,
       }))
     );
   };
 
-  const sidebarItems = [
-    { icon: <Grid size={20} />, label: "Templates" },
-    { icon: <Type size={20} />, label: "Text", action: handleAddText },
-    { icon: <Image size={20} />, label: "Photos" },
-    { icon: <Layers size={20} />, label: "Elements" },
-  ];
+  const handleDeleteSelected = () => {
+    if (selectedId) {
+      setTexts(texts.filter((t) => t.id !== selectedId));
+      selectShape(null);
+      setShowPanel(false);
+    }
+  };
+
+  const handleRotate = () => {
+    if (selectedId) {
+      const selectedText = texts.find((t) => t.id === selectedId);
+      if (selectedText) {
+        handleTextChange(
+          selectedId,
+          "rotation",
+          (selectedText.rotation + 15) % 360
+        );
+      }
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* Left Sidebar */}
       <div className="w-64 bg-white shadow-md flex flex-col">
         <div className="p-4">
-          <h2 className="text-lg font-semibold mb-4">YT Thumbnail Editor</h2>
-          {sidebarItems.map((item, index) => (
-            <Button
-              key={index}
-              variant={activeTab === item.label ? "secondary" : "ghost"}
-              className="w-full justify-start mb-2"
-              onClick={() => {
-                setActiveTab(item.label);
-                if (item.action) item.action();
-              }}
-            >
-              {item.icon}
-              <span className="ml-2">{item.label}</span>
-            </Button>
-          ))}
-        </div>
-        <ScrollArea className="flex-1 p-4">
-          {activeTab === "Templates" && (
-            <div className="grid grid-cols-2 gap-4">
-              {templates.map((template, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  className="h-24 flex flex-col items-center justify-center text-center p-2"
-                  style={{ backgroundColor: template.backgroundColor }}
-                  onClick={() => applyTemplate(template)}
-                >
-                  <span
-                    className="text-xs"
-                    style={{ color: template.texts[0].color }}
+          <h2 className="text-lg font-semibold mb-4">
+            YT Thumbnail Creator
+          </h2>
+          <Tabs defaultValue="templates" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="templates">
+                <Grid className="w-4 h-4" />
+              </TabsTrigger>
+              <TabsTrigger value="text">
+                <Type className="w-4 h-4" />
+              </TabsTrigger>
+              <TabsTrigger value="photos">
+                <Image className="w-4 h-4" />
+              </TabsTrigger>
+              <TabsTrigger value="elements">
+                <Layers className="w-4 h-4" />
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="templates">
+              <ScrollArea className="h-[calc(100vh-200px)]">
+                <div className="grid grid-cols-2 gap-4">
+                  {templates.map((template, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      className="h-24 flex flex-col items-center justify-center text-center p-2"
+                      style={{ backgroundColor: template.backgroundColor }}
+                      onClick={() => applyTemplate(template)}
+                    >
+                      <span
+                        className="text-xs"
+                        style={{ color: template.texts[0].color }}
+                      >
+                        {template.name}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="text">
+              <ScrollArea className="h-[calc(100vh-200px)]">
+                <div className="space-y-2">
+                  {textTemplates.map((template, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => handleAddText(template)}
+                    >
+                      {template.name}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => handleAddText()}
                   >
-                    {template.name}
-                  </span>
-                </Button>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+                    Custom Text
+                  </Button>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="photos">
+              <div className="p-4">
+                <p>Photo upload functionality to be implemented.</p>
+              </div>
+            </TabsContent>
+            <TabsContent value="elements">
+              <div className="p-4">
+                <p>Elements functionality to be implemented.</p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
         <div className="bg-white shadow-sm p-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4"></div>
           <div className="flex items-center space-x-4">
-            {/* Image Upload Button */}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={() => fileInputRef.current?.click()}
-              style={{ display: "none" }}
-              id="upload-button"
-            />
-            <label htmlFor="upload-button" style={{ cursor: "pointer" }}>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-              >
-                <Upload size={24} style={{ paddingRight: 10 }} />
-                Upload Image
-              </Button>
-            </label>
-
-            <Button onClick={handleDownload}>Download</Button>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Button onClick={() => fileInputRef.current?.click()}>
+              <Upload className="w-4 h-4 mr-2" />
+              Upload
+            </Button>
+            <Button onClick={handleDownload}>
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
           </div>
         </div>
 
         {/* Editor Area */}
-        <div className="flex-1 flex justify-center items-center relative">
+        <div className="flex-1 flex justify-center items-center relative overflow-hidden">
           {/* Canvas Area */}
-          <div className="border border-[#eee] rounded-lg bg-white shadow-lg overflow-hidden">
+          <div
+            ref={containerRef}
+            className="border border-[#eee] rounded-lg bg-white shadow-lg overflow-hidden"
+            style={{
+              transform: `scale(${containerScale})`,
+              transformOrigin: "center",
+              transition: "transform 0.3s ease-out",
+            }}
+          >
             <Stage
               width={STAGE_WIDTH}
               height={STAGE_HEIGHT}
               onMouseDown={checkDeselect}
               onTouchStart={checkDeselect}
               ref={stageRef}
-              scaleX={scale}
-              scaleY={scale}
             >
               <Layer>
                 <Rect
@@ -651,9 +760,14 @@ export default function ImageEditor() {
                     fill={textItem.color}
                     x={textItem.x}
                     y={textItem.y}
+                    rotation={textItem.rotation}
                     draggable
                     onClick={() => selectShape(textItem.id)}
                     onTap={() => selectShape(textItem.id)}
+                    onDragEnd={(e) => {
+                      handleTextChange(textItem.id, "x", e.target.x());
+                      handleTextChange(textItem.id, "y", e.target.y());
+                    }}
                     onTransformEnd={handleTransformEnd}
                   />
                 ))}
@@ -815,6 +929,19 @@ export default function ImageEditor() {
                       </PopoverContent>
                     </Popover>
                   </div>
+                  <div className="flex space-x-2">
+                    <Button onClick={handleRotate}>
+                      <RotateCw className="w-4 h-4 mr-2" />
+                      Rotate
+                    </Button>
+                    <Button
+                      onClick={handleDeleteSelected}
+                      variant="destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
@@ -829,16 +956,16 @@ export default function ImageEditor() {
               min="0.5"
               max="2"
               step="0.1"
-              value={scale}
-              onChange={(e) => setScale(Number(e.target.value))}
+              value={containerScale}
+              onChange={(e) => setContainerScale(Number(e.target.value))}
               className="w-32"
             />
-            <span>{Math.round(scale * 100)}%</span>
+            <span>{Math.round(containerScale * 100)}%</span>
           </div>
         </div>
       </div>
 
-      {/* Hidden file input */}
+      {/* Hidden file input for image upload */}
       <input
         type="file"
         ref={fileInputRef}
